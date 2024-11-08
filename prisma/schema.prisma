@@ -178,7 +178,7 @@ model Profile {
   PostQuote             PostQuote[]
   BookmarkFolder        BookmarkFolder[]
   ReportPost            ReportPost[]
-  MessageSender         Message[]             @relation("sender")
+  Message               Message[]
   MessageReceiver       Message[]             @relation("receiver")
   MessageReaction       MessageReaction[]
   MessageHidden         MessageHidden[]
@@ -535,8 +535,8 @@ model Trend {
 
 model Message {
   messageId  String    @id @default(uuid())
-  senderId   String
-  sender     Profile   @relation("sender", fields: [senderId], references: [profileId], onDelete: Cascade)
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   receiverId String
   receiver   Profile   @relation("receiver", fields: [receiverId], references: [profileId], onDelete: Cascade)
   replyToId  String?
@@ -550,7 +550,7 @@ model Message {
   MessageAsset    MessageAsset[]
   MessageReaction MessageReaction[]
 
-  @@index([senderId])
+  @@index([profileId])
   @@index([receiverId])
   @@index([createdAt])
 }
@@ -581,15 +581,15 @@ model MessageAsset {
 }
 
 model MessageHidden {
-  hiddenId   String  @id @default(uuid())
-  profileId  String
-  profile    Profile @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
-  receiverId String
-  receiver   Profile @relation("receiver", fields: [receiverId], references: [profileId], onDelete: Cascade)
+  hiddenId  String  @id @default(uuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
+  senderId  String
+  sender    Profile @relation("receiver", fields: [senderId], references: [profileId], onDelete: Cascade)
 
-  @@unique([profileId, receiverId])
+  @@unique([profileId, senderId])
   @@index([profileId])
-  @@index([receiverId])
+  @@index([senderId])
 }
 
 model ReportProfile {
