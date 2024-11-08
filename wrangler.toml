@@ -1,0 +1,16 @@
+name = "subnect-websocket"
+main = "src/index.ts"
+compatibility_date = "2024-08-21"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "WEBSOCKET"
+class_name = "WebSocketServer"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["WebSocketServer"]
+
+routes = [
+  { pattern = "subnect.com/api/websocket/*", zone_name = "subnect.com" }
+]
