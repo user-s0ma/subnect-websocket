@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaTiDBCloud } from "@tidbcloud/prisma-adapter";
-import { connect } from "@tidbcloud/serverless";
 import checkAuth from "@/checkAuth";
+import { getPrismaClient } from "./lib/db";
 
 interface WebSocketSession {
   type: string;
@@ -22,9 +20,7 @@ export default {
     try {
       switch (request.method) {
         case "GET": {
-          const connection = connect({ url: env.DATABASE_URL });
-          const adapter = new PrismaTiDBCloud(connection);
-          const prisma = new PrismaClient({ adapter });
+          const prisma = getPrismaClient();
           const { profileId } = await checkAuth(request, prisma);
 
           if (profileId) {
@@ -78,9 +74,7 @@ export class WebSocketServer {
         let data: {} = {}
         switch (type) {
           case "calls": {
-            const connection = connect({ url: this.env.DATABASE_URL });
-            const adapter = new PrismaTiDBCloud(connection);
-            const prisma = new PrismaClient({ adapter });
+            const prisma = getPrismaClient();
             const { profileId } = await checkAuth(request, prisma);
             const roomId = url.searchParams.get("roomId");
             data = { roomId, profileId };
@@ -116,9 +110,7 @@ export class WebSocketServer {
   };
 
   private async RoomDisconnect(session: WebSocketSession): Promise<void> {
-    const connection = connect({ url: this.env.DATABASE_URL });
-    const adapter = new PrismaTiDBCloud(connection);
-    const prisma = new PrismaClient({ adapter });
+    const prisma = getPrismaClient();
 
     await prisma.roomMember.delete({
       where: {
