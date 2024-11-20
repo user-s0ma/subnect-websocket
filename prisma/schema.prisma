@@ -183,12 +183,12 @@ model Profile {
   MessageReaction       MessageReaction[]
   MessageHidden         MessageHidden[]
   MessageHiddenReceiver MessageHidden[]       @relation("receiver")
-  ReportProfile         ReportProfile[]
-  ReportProfileReported ReportProfile[]       @relation("reported")
+  RoomMember            RoomMember[]
   AdUrlView             AdUrlView[]
   AdPost                AdPost[]
   AdPostRead            AdPostRead[]
-  AdHeader              AdHeader[]
+  ReportProfile         ReportProfile[]
+  ReportProfileReported ReportProfile[]       @relation("reported")
 
   @@index([profileId])
   @@index([username])
@@ -240,7 +240,6 @@ model Asset {
   AssetVideo    AssetVideo?
   PostAsset     PostAsset[]
   MessageAsset  MessageAsset[]
-  AdHeader      AdHeader[]
 
   @@index([profileId])
 }
@@ -585,43 +584,35 @@ model MessageAsset {
 }
 
 model MessageHidden {
-  hiddenId  String  @id @default(uuid())
-  profileId String
-  profile   Profile @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
-  senderId  String
-  sender    Profile @relation("receiver", fields: [senderId], references: [profileId], onDelete: Cascade)
-
-  @@unique([profileId, senderId])
-  @@index([profileId])
-  @@index([senderId])
-}
-
-model ReportProfile {
-  reportId   String   @id @default(uuid())
+  hiddenId   String  @id @default(uuid())
   profileId  String
-  profile    Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
-  reportedId String
-  reported   Profile  @relation("reported", fields: [reportedId], references: [profileId], onDelete: Cascade)
-  category   String?
-  reason     String   @db.Text
-  createdAt  DateTime @default(now())
+  profile    Profile @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
+  receiverId String
+  receiver   Profile @relation("receiver", fields: [receiverId], references: [profileId], onDelete: Cascade)
 
+  @@unique([profileId, receiverId])
   @@index([profileId])
-  @@index([reportedId])
+  @@index([receiverId])
 }
 
-model ReportPost {
-  reportId  String   @id @default(uuid())
-  profileId String
-  profile   Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
-  postId    String
-  post      Post     @relation(fields: [postId], references: [postId], onDelete: Cascade)
-  category  String?
-  reason    String   @db.Text
+model Room {
+  roomId    String   @id @default(uuid())
+  name      String
   createdAt DateTime @default(now())
 
-  @@index([profileId])
-  @@index([postId])
+  members RoomMember[]
+}
+
+model RoomMember {
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [profileId])
+  roomId    String
+  room      Room    @relation(fields: [roomId], references: [roomId])
+  speaker   Boolean @default(false)
+  mute      Boolean @default(true)
+
+  @@unique([profileId, roomId])
+  @@index([roomId])
 }
 
 model AdUrl {
@@ -631,7 +622,6 @@ model AdUrl {
 
   AdUrlView AdUrlView[]
   AdPost    AdPost[]
-  AdHeader  AdHeader[]
 
   @@index([urlId])
 }
@@ -681,22 +671,32 @@ model AdPostRead {
   @@index([createdAt])
 }
 
-model AdHeader {
-  adId      String   @id @default(uuid())
+model ReportProfile {
+  reportId   String   @id @default(uuid())
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
+  reportedId String
+  reported   Profile  @relation("reported", fields: [reportedId], references: [profileId], onDelete: Cascade)
+  category   String?
+  reason     String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([profileId])
+  @@index([reportedId])
+}
+
+model ReportPost {
+  reportId  String   @id @default(uuid())
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
-  name      String
-  assetId   String
-  asset     Asset    @relation(fields: [assetId], references: [assetId])
-  text      String?  @db.Text
-  urlId     String?
-  url       AdUrl?   @relation(fields: [urlId], references: [urlId], onDelete: Cascade)
-  budget    Float
-  startDate DateTime
-  endDate   DateTime
+  postId    String
+  post      Post     @relation(fields: [postId], references: [postId], onDelete: Cascade)
+  category  String?
+  reason    String   @db.Text
   createdAt DateTime @default(now())
 
   @@index([profileId])
+  @@index([postId])
 }
 
 model AdminLog {
