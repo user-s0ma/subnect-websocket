@@ -55,7 +55,6 @@ export default {
               default:
                 idName = `${type}:${profileId}`;
             };
-            console.log(idName);
 
             const id = env.WEBSOCKET.idFromName(idName);
             const roomObject = env.WEBSOCKET.get(id);
@@ -101,7 +100,6 @@ export class WebSocketServer {
     switch (type) {
       case "rooms": {
         id = url.searchParams.get("roomId");
-        console.log(id);
         break;
       };
       default:
@@ -132,7 +130,6 @@ export class WebSocketServer {
       case "POST": {
         const message: any = await request.json();
 
-        console.log(type, id);
         this.broadcast(message, type, id);
         return new Response("Message sent", { status: 200 });
       };
@@ -156,7 +153,9 @@ export class WebSocketServer {
   private async roomDisconnect(session: WebSocketSession): Promise<void> {
     const prisma = getPrismaClient(this.env);
 
-    await prisma.roomMember.delete({
+    const room = await prisma.room.findUnique({ where: { roomId: session.id } });
+
+    const deletedMember = await prisma.roomMember.delete({
       where: {
         profileId_roomId: {
           profileId: session.data.profileId,
@@ -164,7 +163,16 @@ export class WebSocketServer {
         }
       }
     });
-    this.broadcast({ type: "MEMBER_DISCONNECTED", profileId: session.data.profileId }, session.type, session.id);
+
+    if (room.profileId === session.data.profileId) {
+      await prisma.room.delete({
+        where: { roomId: session.id }
+      });
+
+      this.broadcast({ event: "ROOM_DELETED" }, "rooms", session.id);
+    } else {
+      this.broadcast({ event: "MEMBER_LEFT", profileId: session.data.profileId, sessionId: deletedMember.sessionId }, "rooms", session.id);
+    };
   };
 
   async webSocketClose(
@@ -192,7 +200,6 @@ export class WebSocketServer {
 
   broadcast(message: any, type: string, id: string): void {
     const messageString = JSON.stringify(message);
-    console.log(this.sessions);
     this.sessions.forEach((session: WebSocketSession, webSocket: WebSocket) => {
       if (session.type === type && session.id === id) {
         webSocket.send(messageString);
