@@ -183,8 +183,9 @@ model Profile {
   MessageReaction       MessageReaction[]
   MessageHidden         MessageHidden[]
   MessageHiddenReceiver MessageHidden[]       @relation("receiver")
+  Room                  Room[]
   RoomMember            RoomMember[]
-  AdUrlView             AdUrlView[]
+  UrlView               UrlView[]
   AdPost                AdPost[]
   AdPostRead            AdPostRead[]
   ReportProfile         ReportProfile[]
@@ -311,6 +312,7 @@ model ProfileWebPush {
 }
 
 model Follow {
+  followId    String   @id @default(uuid())
   profileId  String
   profile    Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   followerId String
@@ -323,6 +325,7 @@ model Follow {
 }
 
 model Block {
+  blockId    String   @id @default(uuid())
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   blockedId String
@@ -353,6 +356,7 @@ model List {
 }
 
 model ListMember {
+  memberId      String   @id @default(uuid())
   listId    String
   list      List     @relation(fields: [listId], references: [listId], onDelete: Cascade)
   profileId String
@@ -364,6 +368,7 @@ model ListMember {
 }
 
 model ListFollow {
+  followId    String   @id @default(uuid())
   listId     String
   list       List     @relation(fields: [listId], references: [listId], onDelete: Cascade)
   followerId String
@@ -525,11 +530,12 @@ model BookmarkFolder {
 }
 
 model Bookmark {
-  postId    String
-  post      Post           @relation(fields: [postId], references: [postId], onDelete: Cascade)
-  folderId  String
-  folder    BookmarkFolder @relation(fields: [folderId], references: [folderId], onDelete: Cascade)
-  createdAt DateTime       @default(now())
+  bookmarkId String         @id @default(uuid())
+  postId     String
+  post       Post           @relation(fields: [postId], references: [postId], onDelete: Cascade)
+  folderId   String
+  folder     BookmarkFolder @relation(fields: [folderId], references: [folderId], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
 
   @@unique([postId, folderId])
   @@index([postId])
@@ -597,6 +603,8 @@ model MessageHidden {
 
 model Room {
   roomId    String   @id @default(uuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [profileId])
   name      String
   createdAt DateTime @default(now())
 
@@ -604,34 +612,37 @@ model Room {
 }
 
 model RoomMember {
+  memberId  String  @id @default(uuid())
   profileId String
   profile   Profile @relation(fields: [profileId], references: [profileId])
   roomId    String
   room      Room    @relation(fields: [roomId], references: [roomId])
+  sessionId String?
   speaker   Boolean @default(false)
   mute      Boolean @default(true)
 
   @@unique([profileId, roomId])
   @@index([roomId])
+  @@index([sessionId])
 }
 
-model AdUrl {
+model Url {
   urlId     String   @id @default(uuid())
   url       String   @db.Text
   createdAt DateTime @default(now())
 
-  AdUrlView AdUrlView[]
-  AdPost    AdPost[]
+  UrlView UrlView[]
+  AdPost  AdPost[]
 
   @@index([urlId])
 }
 
-model AdUrlView {
+model UrlView {
   viewId    String   @id @default(uuid())
   profileId String?
   profile   Profile? @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   urlId     String
-  url       AdUrl    @relation(fields: [urlId], references: [urlId], onDelete: Cascade)
+  url       Url      @relation(fields: [urlId], references: [urlId], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@index([profileId])
@@ -647,7 +658,7 @@ model AdPost {
   postId     String
   post       Post         @relation(fields: [postId], references: [postId], onDelete: Cascade)
   urlId      String?
-  url        AdUrl?       @relation(fields: [urlId], references: [urlId], onDelete: Cascade)
+  url        Url?         @relation(fields: [urlId], references: [urlId], onDelete: SetNull)
   budget     Float
   startDate  DateTime
   endDate    DateTime

@@ -3,9 +3,9 @@ import { getPrismaClient } from "./lib/db";
 
 interface WebSocketSession {
   type: string;
+  id: string;
   data: {
     profileId?: string;
-    roomId?: string;
   };
 };
 
@@ -20,7 +20,7 @@ export default {
     try {
       switch (request.method) {
         case "GET": {
-          const prisma = getPrismaClient();
+          const prisma = getPrismaClient(env);
           const { profileId } = await checkAuth(request, prisma);
 
           if (profileId) {
@@ -28,7 +28,36 @@ export default {
             const pathSegments = url.pathname.split("/").filter(Boolean);
             const type = pathSegments[pathSegments.length - 1] || "";
 
-            const id = env.WEBSOCKET.idFromName(`${type}:${profileId}`);
+            let idName: string;
+            switch (type) {
+              case "rooms": {
+                const roomId = url.searchParams.get("roomId");
+                if (!roomId) {
+                  return new Response("Room ID not provided", { status: 400 });
+                }
+
+                const member = await prisma.roomMember.findUnique({
+                  where: {
+                    profileId_roomId: {
+                      profileId,
+                      roomId
+                    }
+                  }
+                });
+
+                if (!member) {
+                  return new Response("Not a member of this room", { status: 403 });
+                }
+
+                idName = `${type}:${roomId}`;
+                break;
+              };
+              default:
+                idName = `${type}:${profileId}`;
+            };
+            console.log(idName);
+
+            const id = env.WEBSOCKET.idFromName(idName);
             const roomObject = env.WEBSOCKET.get(id);
 
             return roomObject.fetch(url.toString(), request);
@@ -61,9 +90,23 @@ export class WebSocketServer {
   };
 
   async fetch(request: Request): Promise<Response> {
+    const prisma = getPrismaClient(this.env);
+    const { profileId } = await checkAuth(request, prisma);
+
     const url = new URL(request.url);
     const pathSegments = url.pathname.split("/").filter(Boolean);
     const type = pathSegments[pathSegments.length - 1] || "";
+
+    let id: string;
+    switch (type) {
+      case "rooms": {
+        id = url.searchParams.get("roomId");
+        console.log(id);
+        break;
+      };
+      default:
+        id = profileId;
+    };
 
     switch (request.method) {
       case "GET": {
@@ -73,25 +116,24 @@ export class WebSocketServer {
 
         let data: {} = {}
         switch (type) {
-          case "calls": {
-            const prisma = getPrismaClient();
-            const { profileId } = await checkAuth(request, prisma);
-            const roomId = url.searchParams.get("roomId");
-            data = { roomId, profileId };
+          case "rooms": {
+            data = { profileId };
           };
           default:
             data = {};
         };
 
         const pair = new WebSocketPair();
-        await this.handleSession(pair[1], type, data);
+
+        await this.handleSession(pair[1], type, id, data);
 
         return new Response(null, { status: 101, webSocket: pair[0] });
       };
       case "POST": {
         const message: any = await request.json();
 
-        this.broadcast(message, type);
+        console.log(type, id);
+        this.broadcast(message, type, id);
         return new Response("Message sent", { status: 200 });
       };
       default:
@@ -102,25 +144,27 @@ export class WebSocketServer {
   private async handleSession(
     webSocket: WebSocket,
     type: string,
+    id: string,
     data: Record<string, any> = {}
   ): Promise<void> {
+    const session: WebSocketSession = { type, id, data };
+    (webSocket as any).serializeAttachment(session);
     this.state.acceptWebSocket(webSocket);
-    const session: WebSocketSession = { type, data };
     this.sessions.set(webSocket, session);
   };
 
-  private async RoomDisconnect(session: WebSocketSession): Promise<void> {
-    const prisma = getPrismaClient();
+  private async roomDisconnect(session: WebSocketSession): Promise<void> {
+    const prisma = getPrismaClient(this.env);
 
     await prisma.roomMember.delete({
       where: {
         profileId_roomId: {
           profileId: session.data.profileId,
-          roomId: session.data.roomId
+          roomId: session.id
         }
       }
     });
-    this.broadcast({ type: "MEMBER_DISCONNECTED", profileId: session.data.profileId }, session.type);
+    this.broadcast({ type: "MEMBER_DISCONNECTED", profileId: session.data.profileId }, session.type, session.id);
   };
 
   async webSocketClose(
@@ -131,8 +175,8 @@ export class WebSocketServer {
   ): Promise<void> {
     const session = this.sessions.get(webSocket);
 
-    if (session.type === "calls") {
-      this.RoomDisconnect(session);
+    if (session.type === "rooms") {
+      this.roomDisconnect(session);
     };
     this.sessions.delete(webSocket);
   };
@@ -140,16 +184,17 @@ export class WebSocketServer {
   async webSocketError(webSocket: WebSocket, error: Error): Promise<void> {
     const session = this.sessions.get(webSocket);
 
-    if (session.type === "calls") {
-      this.RoomDisconnect(session);
+    if (session.type === "rooms") {
+      this.roomDisconnect(session);
     };
     this.sessions.delete(webSocket);
   };
 
-  broadcast(message: any, type: string): void {
+  broadcast(message: any, type: string, id: string): void {
     const messageString = JSON.stringify(message);
+    console.log(this.sessions);
     this.sessions.forEach((session: WebSocketSession, webSocket: WebSocket) => {
-      if (session.type === type) {
+      if (session.type === type && session.id === id) {
         webSocket.send(messageString);
       }
     });
