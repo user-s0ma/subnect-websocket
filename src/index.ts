@@ -4,9 +4,7 @@ import { getPrismaClient } from "./lib/db";
 interface WebSocketSession {
   type: string;
   id: string;
-  data: {
-    profileId?: string;
-  };
+  profileId?: string;
 };
 
 interface Env {
@@ -28,36 +26,31 @@ export default {
             const pathSegments = url.pathname.split("/").filter(Boolean);
             const type = pathSegments[pathSegments.length - 1] || "";
 
-            let idName: string;
+            const id = url.searchParams.get("id") || profileId;
+            
             switch (type) {
               case "rooms": {
-                const roomId = url.searchParams.get("roomId");
-                if (!roomId) {
+                if (!id) {
                   return new Response("Room ID not provided", { status: 400 });
-                }
-
+                };
                 const member = await prisma.roomMember.findUnique({
                   where: {
                     profileId_roomId: {
                       profileId,
-                      roomId
+                      roomId: id
                     }
                   }
                 });
-
                 if (!member) {
                   return new Response("Not a member of this room", { status: 403 });
-                }
-
-                idName = `${type}:${roomId}`;
+                };
                 break;
               };
               default:
-                idName = `${type}:${profileId}`;
             };
 
-            const id = env.WEBSOCKET.idFromName(idName);
-            const roomObject = env.WEBSOCKET.get(id);
+            const wsId = env.WEBSOCKET.idFromName(`${type}:${id}`);
+            const roomObject = env.WEBSOCKET.get(wsId);
 
             return roomObject.fetch(url.toString(), request);
           }
@@ -96,15 +89,7 @@ export class WebSocketServer {
     const pathSegments = url.pathname.split("/").filter(Boolean);
     const type = pathSegments[pathSegments.length - 1] || "";
 
-    let id: string;
-    switch (type) {
-      case "rooms": {
-        id = url.searchParams.get("roomId");
-        break;
-      };
-      default:
-        id = profileId;
-    };
+    const id = url.searchParams.get("id") || profileId;
 
     switch (request.method) {
       case "GET": {
@@ -112,18 +97,8 @@ export class WebSocketServer {
           return new Response("expected websocket", { status: 400 });
         };
 
-        let data: {} = {}
-        switch (type) {
-          case "rooms": {
-            data = { profileId };
-          };
-          default:
-            data = {};
-        };
-
         const pair = new WebSocketPair();
-
-        await this.handleSession(pair[1], type, id, data);
+        await this.handleSession(pair[1], type, id, profileId);
 
         return new Response(null, { status: 101, webSocket: pair[0] });
       };
@@ -142,9 +117,9 @@ export class WebSocketServer {
     webSocket: WebSocket,
     type: string,
     id: string,
-    data: Record<string, any> = {}
+    profileId: string,
   ): Promise<void> {
-    const session: WebSocketSession = { type, id, data };
+    const session: WebSocketSession = { type, id, profileId };
     (webSocket as any).serializeAttachment(session);
     this.state.acceptWebSocket(webSocket);
     this.sessions.set(webSocket, session);
@@ -158,20 +133,20 @@ export class WebSocketServer {
     const deletedMember = await prisma.roomMember.delete({
       where: {
         profileId_roomId: {
-          profileId: session.data.profileId,
+          profileId: session.profileId,
           roomId: session.id
         }
       }
     });
 
-    if (room.profileId === session.data.profileId) {
+    if (room.profileId === session.profileId) {
       await prisma.room.delete({
         where: { roomId: session.id }
       });
 
       this.broadcast({ event: "ROOM_DELETED" }, "rooms", session.id);
     } else {
-      this.broadcast({ event: "MEMBER_LEFT", profileId: session.data.profileId, sessionId: deletedMember.sessionId }, "rooms", session.id);
+      this.broadcast({ event: "MEMBER_LEFT", profileId: session.profileId, sessionId: deletedMember.sessionId }, "rooms", session.id);
     };
   };
 
@@ -184,7 +159,7 @@ export class WebSocketServer {
     const session = this.sessions.get(webSocket);
 
     if (session.type === "rooms") {
-      this.roomDisconnect(session);
+      //this.roomDisconnect(session);
     };
     this.sessions.delete(webSocket);
   };
@@ -193,7 +168,7 @@ export class WebSocketServer {
     const session = this.sessions.get(webSocket);
 
     if (session.type === "rooms") {
-      this.roomDisconnect(session);
+      //this.roomDisconnect(session);
     };
     this.sessions.delete(webSocket);
   };

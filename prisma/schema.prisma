@@ -312,7 +312,7 @@ model ProfileWebPush {
 }
 
 model Follow {
-  followId    String   @id @default(uuid())
+  followId   String   @id @default(uuid())
   profileId  String
   profile    Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   followerId String
@@ -325,7 +325,7 @@ model Follow {
 }
 
 model Block {
-  blockId    String   @id @default(uuid())
+  blockId   String   @id @default(uuid())
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   blockedId String
@@ -356,7 +356,7 @@ model List {
 }
 
 model ListMember {
-  memberId      String   @id @default(uuid())
+  memberId  String   @id @default(uuid())
   listId    String
   list      List     @relation(fields: [listId], references: [listId], onDelete: Cascade)
   profileId String
@@ -368,7 +368,7 @@ model ListMember {
 }
 
 model ListFollow {
-  followId    String   @id @default(uuid())
+  followId   String   @id @default(uuid())
   listId     String
   list       List     @relation(fields: [listId], references: [listId], onDelete: Cascade)
   followerId String
@@ -604,7 +604,7 @@ model MessageHidden {
 model Room {
   roomId    String   @id @default(uuid())
   profileId String
-  profile   Profile  @relation(fields: [profileId], references: [profileId])
+  profile   Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
   name      String
   createdAt DateTime @default(now())
 
@@ -616,14 +616,12 @@ model RoomMember {
   profileId String
   profile   Profile @relation(fields: [profileId], references: [profileId])
   roomId    String
-  room      Room    @relation(fields: [roomId], references: [roomId])
-  sessionId String?
+  room      Room    @relation(fields: [roomId], references: [roomId], onDelete: Cascade)
   speaker   Boolean @default(false)
-  mute      Boolean @default(true)
+  sessionId String?
 
   @@unique([profileId, roomId])
   @@index([roomId])
-  @@index([sessionId])
 }
 
 model Url {
