@@ -183,8 +183,6 @@ model Profile {
   MessageReaction       MessageReaction[]
   MessageHidden         MessageHidden[]
   MessageHiddenReceiver MessageHidden[]       @relation("receiver")
-  Room                  Room[]
-  RoomMember            RoomMember[]
   UrlView               UrlView[]
   AdPost                AdPost[]
   AdPostRead            AdPostRead[]
@@ -599,29 +597,6 @@ model MessageHidden {
   @@unique([profileId, receiverId])
   @@index([profileId])
   @@index([receiverId])
-}
-
-model Room {
-  roomId    String   @id @default(uuid())
-  profileId String
-  profile   Profile  @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
-  name      String
-  createdAt DateTime @default(now())
-
-  members RoomMember[]
-}
-
-model RoomMember {
-  memberId  String  @id @default(uuid())
-  profileId String
-  profile   Profile @relation(fields: [profileId], references: [profileId])
-  roomId    String
-  room      Room    @relation(fields: [roomId], references: [roomId], onDelete: Cascade)
-  speaker   Boolean @default(false)
-  sessionId String?
-
-  @@unique([profileId, roomId])
-  @@index([roomId])
 }
 
 model Url {

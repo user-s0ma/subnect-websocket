@@ -12,7 +12,7 @@ export default async function checkAuth(request: Request, prisma: PrismaClient):
   const sessionToken = cookieHeader
     .split(";")
     .map(cookie => cookie.trim())
-    .find(cookie => cookie.startsWith("__Secure-authjs.session-token=") || cookie.startsWith("authjs.session-token="))
+    .find(cookie => cookie.startsWith("subnect.session-token="))
     ?.split("=")[1];
 
   if (!sessionToken) {
@@ -33,7 +33,7 @@ export default async function checkAuth(request: Request, prisma: PrismaClient):
   const session_profileId = cookieHeader
     .split(";")
     .map(cookie => cookie.trim())
-    .find(cookie => cookie.startsWith("session-profileId="))
+    .find(cookie => cookie.startsWith("subnect.session-profileId="))
     ?.split("=")[1];
   let profile: { profileId: string };
   if (session_profileId) {

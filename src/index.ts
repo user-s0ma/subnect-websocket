@@ -27,26 +27,12 @@ export default {
             const type = pathSegments[pathSegments.length - 1] || "";
 
             const id = url.searchParams.get("id") || profileId;
-            
+
             switch (type) {
-              case "rooms": {
-                if (!id) {
-                  return new Response("Room ID not provided", { status: 400 });
-                };
-                const member = await prisma.roomMember.findUnique({
-                  where: {
-                    profileId_roomId: {
-                      profileId,
-                      roomId: id
-                    }
-                  }
-                });
-                if (!member) {
-                  return new Response("Not a member of this room", { status: 403 });
-                };
-                break;
-              };
               default:
+                if (id !== profileId) {
+                  return new Response("you do not have permission.", { status: 403 });
+                };
             };
 
             const wsId = env.WEBSOCKET.idFromName(`${type}:${id}`);
@@ -125,31 +111,6 @@ export class WebSocketServer {
     this.sessions.set(webSocket, session);
   };
 
-  private async roomDisconnect(session: WebSocketSession): Promise<void> {
-    const prisma = getPrismaClient(this.env);
-
-    const room = await prisma.room.findUnique({ where: { roomId: session.id } });
-
-    const deletedMember = await prisma.roomMember.delete({
-      where: {
-        profileId_roomId: {
-          profileId: session.profileId,
-          roomId: session.id
-        }
-      }
-    });
-
-    if (room.profileId === session.profileId) {
-      await prisma.room.delete({
-        where: { roomId: session.id }
-      });
-
-      this.broadcast({ event: "ROOM_DELETED" }, "rooms", session.id);
-    } else {
-      this.broadcast({ event: "MEMBER_LEFT", profileId: session.profileId, sessionId: deletedMember.sessionId }, "rooms", session.id);
-    };
-  };
-
   async webSocketClose(
     webSocket: WebSocket,
     code: number,
@@ -158,18 +119,12 @@ export class WebSocketServer {
   ): Promise<void> {
     const session = this.sessions.get(webSocket);
 
-    if (session.type === "rooms") {
-      //this.roomDisconnect(session);
-    };
     this.sessions.delete(webSocket);
   };
 
   async webSocketError(webSocket: WebSocket, error: Error): Promise<void> {
     const session = this.sessions.get(webSocket);
 
-    if (session.type === "rooms") {
-      //this.roomDisconnect(session);
-    };
     this.sessions.delete(webSocket);
   };
 
