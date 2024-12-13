@@ -3,7 +3,6 @@ import { getPrismaClient } from "./lib/db";
 
 interface WebSocketSession {
   type: string;
-  id: string;
   profileId?: string;
 };
 
@@ -39,6 +38,8 @@ export default {
             const roomObject = env.WEBSOCKET.get(wsId);
 
             return roomObject.fetch(url.toString(), request);
+          } else {
+            return new Response("User not authenticated.", { status: 404 });
           }
         };
         default:
@@ -75,8 +76,6 @@ export class WebSocketServer {
     const pathSegments = url.pathname.split("/").filter(Boolean);
     const type = pathSegments[pathSegments.length - 1] || "";
 
-    const id = url.searchParams.get("id") || profileId;
-
     switch (request.method) {
       case "GET": {
         if (request.headers.get("Upgrade") !== "websocket") {
@@ -84,14 +83,14 @@ export class WebSocketServer {
         };
 
         const pair = new WebSocketPair();
-        await this.handleSession(pair[1], type, id, profileId);
+        await this.handleSession(pair[1], type, profileId);
 
         return new Response(null, { status: 101, webSocket: pair[0] });
       };
       case "POST": {
         const message: any = await request.json();
 
-        this.broadcast(message, type, id);
+        this.broadcast(message, type);
         return new Response("Message sent", { status: 200 });
       };
       default:
@@ -102,10 +101,9 @@ export class WebSocketServer {
   private async handleSession(
     webSocket: WebSocket,
     type: string,
-    id: string,
     profileId: string,
   ): Promise<void> {
-    const session: WebSocketSession = { type, id, profileId };
+    const session: WebSocketSession = { type, profileId };
     (webSocket as any).serializeAttachment(session);
     this.state.acceptWebSocket(webSocket);
     this.sessions.set(webSocket, session);
@@ -128,10 +126,10 @@ export class WebSocketServer {
     this.sessions.delete(webSocket);
   };
 
-  broadcast(message: any, type: string, id: string): void {
+  broadcast(message: any, type: string): void {
     const messageString = JSON.stringify(message);
     this.sessions.forEach((session: WebSocketSession, webSocket: WebSocket) => {
-      if (session.type === type && session.id === id) {
+      if (session.type === type) {
         webSocket.send(messageString);
       }
     });
